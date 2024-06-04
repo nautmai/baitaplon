@@ -5,6 +5,8 @@ import random
 import re
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
+import requests
+from bs4 import BeautifulSoup
 
 # Khởi tạo ứng dụng Flask
 app = Flask(__name__)
@@ -19,6 +21,41 @@ def remove_text_comments(text):
     # Sử dụng biểu thức chính quy để loại bỏ các chú thích
     text = re.sub(r'\[[^\]]*\]', '', text) # Loại bỏ các chú thích nằm trong dấu ngoặc vuông
     return text
+
+# Hàm lấy văn bản từ URL
+def get_text_from_url(url):
+    try:
+        # Lấy nội dung của trang web
+        response = requests.get(url)
+        # Kiểm tra xem request có thành công hay không
+        if response.status_code == 200:
+            # Sử dụng BeautifulSoup để phân tích cú pháp HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Trích xuất văn bản từ các thẻ <p>
+            paragraphs = soup.find_all('p')
+            # Kết hợp văn bản từ các đoạn văn
+            text = '\n'.join([p.get_text() for p in paragraphs])
+            return text
+        else:
+            print("Không thể lấy nội dung từ URL")
+            return None
+    except Exception as e:
+        print("Đã có lỗi xảy ra:", str(e))
+        return None
+
+def save_text_to_file(text, filename):
+    try:
+        with open(filename, 'w', encoding='utf-8') as file:
+            file.write(text)
+        print(f"Đã lưu văn bản vào file {filename}")
+    except Exception as e:
+        print("Đã có lỗi xảy ra khi lưu văn bản vào file:", str(e))
+
+# Thay URL bằng địa chỉ của trang web bạn muốn lấy văn bản
+url = "https://en.wikipedia.org/wiki/ChatGPT"
+text = get_text_from_url(url)
+if text:
+    save_text_to_file(text, 'data.txt')
 
 # Đọc dữ liệu từ file và chuyển thành chữ thường
 with open('data.txt', 'r', errors='ignore') as f:
@@ -83,7 +120,13 @@ def index():
 @app.route("/get_response", methods=["POST"])
 def get_response():
     user_response = request.form["msg"].lower()
-    if user_response not in ['bye', 'thanks', 'thank you']:
+    if user_response.startswith("http"):
+        text = get_text_from_url(user_response)
+        if text:
+            return jsonify({"response": text})
+        else:
+            return jsonify({"response": "Sorry, unable to retrieve text from the provided URL."})
+    elif user_response not in ['bye', 'thanks', 'thank you']:
         if greet(user_response):
             return jsonify({"response": greet(user_response)})
         else:
