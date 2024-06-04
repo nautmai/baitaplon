@@ -4,7 +4,7 @@ import string
 import random
 import re
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 import requests
 from bs4 import BeautifulSoup
 
@@ -90,16 +90,17 @@ def greet(sentence):
         if word.lower() in greet_inputs:
             return random.choice(greet_responses)
 
-# Tải mô hình BERT đã được huấn luyện sẵn
-model = SentenceTransformer('bert-base-nli-mean-tokens')
-# Mã hóa các câu thành vector
-sentence_embeddings = model.encode(sentence_tokens)
+# Khởi tạo TF-IDF vectorizer
+tfidf_vectorizer = TfidfVectorizer(tokenizer=LemNormalize)
 
-# Hàm phản hồi dựa trên văn bản người dùng nhập vào
+# Fit và chuyển đổi câu thành vector TF-IDF
+tfidf_sentence_embeddings = tfidf_vectorizer.fit_transform(sentence_tokens)
+
+# Hàm phản hồi dựa trên văn bản người dùng nhập vào sử dụng TF-IDF
 def response(user_response):
     sentence_tokens.append(user_response)
-    user_embedding = model.encode([user_response])
-    similarities = cosine_similarity(user_embedding, sentence_embeddings)
+    user_tfidf = tfidf_vectorizer.transform([user_response])
+    similarities = cosine_similarity(user_tfidf, tfidf_sentence_embeddings)
     idx = similarities.argsort()[0][-1]
     flat = similarities.flatten()
     flat.sort()
